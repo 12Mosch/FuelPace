@@ -1,11 +1,10 @@
-import { v } from "convex/values"
+import { ConvexError, v } from "convex/values"
 import { internal } from "./_generated/api"
 import { action, internalMutation, mutation, query } from "./_generated/server"
 
 const connectionSummary = v.object({
   athleteId: v.string(),
   athleteName: v.string(),
-  grantedScopes: v.array(v.string()),
   connectedAt: v.number(),
   updatedAt: v.number(),
 })
@@ -13,7 +12,6 @@ const connectionSummary = v.object({
 type ConnectionSummary = {
   athleteId: string
   athleteName: string
-  grantedScopes: string[]
   connectedAt: number
   updatedAt: number
 }
@@ -22,7 +20,7 @@ type EncryptedConnection = Omit<
   ConnectionSummary,
   "connectedAt" | "updatedAt"
 > & {
-  encryptedAccessToken: string
+  encryptedApiKey: string
   encryptionIv: string
   encryptionVersion: "aes-256-gcm-v1"
 }
@@ -38,14 +36,12 @@ async function requireOwner(ctx: {
 function summarize(connection: {
   athleteId: string
   athleteName: string
-  grantedScopes: string[]
   connectedAt: number
   updatedAt: number
 }) {
   return {
     athleteId: connection.athleteId,
     athleteName: connection.athleteName,
-    grantedScopes: connection.grantedScopes,
     connectedAt: connection.connectedAt,
     updatedAt: connection.updatedAt,
   }
@@ -66,15 +62,18 @@ export const getConnection = query({
   },
 })
 
-export const completeOAuth = action({
-  args: { code: v.string() },
+export const connectWithApiKey = action({
+  args: { apiKey: v.string() },
   returns: connectionSummary,
-  handler: async (ctx, { code }): Promise<ConnectionSummary> => {
+  handler: async (ctx, { apiKey }): Promise<ConnectionSummary> => {
     const ownerTokenIdentifier = await requireOwner(ctx)
-    if (!code.trim()) throw new Error("Missing authorization code")
+    const trimmedApiKey = apiKey.trim()
+    if (!trimmedApiKey) {
+      throw new ConvexError({ code: "INVALID_API_KEY" })
+    }
     const credential: EncryptedConnection = await ctx.runAction(
-      internal.intervalsNode.exchangeAndEncrypt,
-      { code },
+      internal.intervalsNode.validateAndEncrypt,
+      { apiKey: trimmedApiKey },
     )
     return await ctx.runMutation(internal.intervals.upsertConnection, {
       ownerTokenIdentifier,
@@ -88,10 +87,9 @@ export const upsertConnection = internalMutation({
     ownerTokenIdentifier: v.string(),
     athleteId: v.string(),
     athleteName: v.string(),
-    encryptedAccessToken: v.string(),
+    encryptedApiKey: v.string(),
     encryptionIv: v.string(),
     encryptionVersion: v.literal("aes-256-gcm-v1"),
-    grantedScopes: v.array(v.string()),
   },
   returns: connectionSummary,
   handler: async (ctx, args) => {

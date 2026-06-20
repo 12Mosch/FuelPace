@@ -1,27 +1,14 @@
-import {
-  createFileRoute,
-  Link,
-  redirect,
-  useNavigate,
-} from "@tanstack/react-router"
-import { useMutation, useQuery } from "convex/react"
+import { createFileRoute, Link, redirect } from "@tanstack/react-router"
+import { useAction, useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
-import { useState } from "react"
+import { type FormEvent, useState } from "react"
 import { api } from "../../convex/_generated/api"
 
-type IntervalsOutcome = "connected" | "denied" | "error"
+const INTERVALS_DEVELOPER_SETTINGS_URL = "https://intervals.icu/settings"
 
 export const Route = createFileRoute("/settings")({
   beforeLoad: ({ context }) => {
     requireSettingsUser(context.user)
-  },
-  validateSearch: (
-    search: Record<string, unknown>,
-  ): { intervals?: IntervalsOutcome } => {
-    const value = search.intervals
-    return value === "connected" || value === "denied" || value === "error"
-      ? { intervals: value }
-      : {}
   },
   errorComponent: SettingsError,
   component: SettingsPage,
@@ -54,9 +41,6 @@ function SettingsError() {
 }
 
 function SettingsPage() {
-  const { intervals } = Route.useSearch()
-  const navigate = useNavigate({ from: Route.fullPath })
-
   return (
     <main className="settings-shell">
       <div className="settings-orbit" aria-hidden="true" />
@@ -70,82 +54,21 @@ function SettingsPage() {
           <p>Manage the services FuelPace can use on your behalf.</p>
         </div>
       </header>
-
-      {intervals ? (
-        <Notice
-          outcome={intervals}
-          onDismiss={() => navigate({ search: {}, replace: true })}
-        />
-      ) : null}
-
       <IntervalsCard />
     </main>
   )
 }
 
-function Notice({
-  outcome,
-  onDismiss,
-}: {
-  outcome: IntervalsOutcome
-  onDismiss: () => void
-}) {
-  const content = {
-    connected: {
-      title: "Intervals.icu connected",
-      body: "Your read-only activity connection is ready.",
-      tone: "success",
-    },
-    denied: {
-      title: "Connection cancelled",
-      body: "Nothing changed. Any existing connection is still active.",
-      tone: "neutral",
-    },
-    error: {
-      title: "Connection failed",
-      body: "Try connecting again. Your existing connection, if any, was preserved.",
-      tone: "error",
-    },
-  }[outcome]
-
-  return (
-    <aside className={`notice notice-${content.tone}`} role="status">
-      <div>
-        <strong>{content.title}</strong>
-        <p>{content.body}</p>
-      </div>
-      <button aria-label="Dismiss message" onClick={onDismiss} type="button">
-        Dismiss
-      </button>
-    </aside>
-  )
-}
-
 export function IntervalsCard() {
   const connection = useQuery(api.intervals.getConnection, {})
+  const connect = useAction(api.intervals.connectWithApiKey)
   const disconnect = useMutation(api.intervals.disconnect)
-  const [isDisconnecting, setIsDisconnecting] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
-
-  async function handleDisconnect() {
-    if (!window.confirm("Disconnect Intervals.icu from FuelPace?")) return
-    setFailure(null)
-    setIsDisconnecting(true)
-    try {
-      await disconnect({})
-    } catch {
-      setFailure("FuelPace could not disconnect the account. Please try again.")
-    } finally {
-      setIsDisconnecting(false)
-    }
-  }
 
   return (
     <IntervalsCardView
       connection={connection}
-      failure={failure}
-      isDisconnecting={isDisconnecting}
-      onDisconnect={handleDisconnect}
+      onConnect={(apiKey) => connect({ apiKey })}
+      onDisconnect={() => disconnect({})}
     />
   )
 }
@@ -154,17 +77,69 @@ type Connection = NonNullable<
   FunctionReturnType<typeof api.intervals.getConnection>
 >
 
+export function intervalsConnectionErrorMessage(error: unknown): string {
+  const data =
+    error && typeof error === "object" && "data" in error
+      ? (error as { data?: unknown }).data
+      : undefined
+  const code =
+    data && typeof data === "object" && "code" in data
+      ? (data as { code?: unknown }).code
+      : undefined
+
+  if (code === "INVALID_API_KEY") {
+    return "That API key is invalid. Check the key in Intervals.icu and try again."
+  }
+  if (code === "INTERVALS_UNAVAILABLE") {
+    return "Intervals.icu is temporarily unavailable. Please try again later."
+  }
+  if (code === "INVALID_RESPONSE") {
+    return "Intervals.icu returned an unexpected response. Please try again later."
+  }
+  return "FuelPace could not connect the account. Please try again."
+}
+
 export function IntervalsCardView({
   connection,
-  failure,
-  isDisconnecting,
+  onConnect,
   onDisconnect,
 }: {
   connection: Connection | null | undefined
-  failure: string | null
-  isDisconnecting: boolean
-  onDisconnect: () => void
+  onConnect: (apiKey: string) => Promise<unknown>
+  onDisconnect: () => Promise<unknown>
 }) {
+  const [apiKey, setApiKey] = useState("")
+  const [isConnecting, setIsConnecting] = useState(false)
+  const [isDisconnecting, setIsDisconnecting] = useState(false)
+  const [failure, setFailure] = useState<string | null>(null)
+
+  async function handleConnect(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setFailure(null)
+    setIsConnecting(true)
+    try {
+      await onConnect(apiKey)
+      setApiKey("")
+    } catch (error) {
+      setFailure(intervalsConnectionErrorMessage(error))
+    } finally {
+      setIsConnecting(false)
+    }
+  }
+
+  async function handleDisconnect() {
+    if (!window.confirm("Disconnect Intervals.icu from FuelPace?")) return
+    setFailure(null)
+    setIsDisconnecting(true)
+    try {
+      await onDisconnect()
+    } catch {
+      setFailure("FuelPace could not disconnect the account. Please try again.")
+    } finally {
+      setIsDisconnecting(false)
+    }
+  }
+
   return (
     <section className="integration-card" aria-labelledby="intervals-title">
       <div className="integration-mark" aria-hidden="true">
@@ -191,74 +166,88 @@ export function IntervalsCardView({
           <div className="connection-loading" aria-live="polite">
             Loading connection status...
           </div>
-        ) : connection ? (
-          <div className="connection-details">
-            <dl>
-              <div>
-                <dt>Athlete</dt>
-                <dd>{connection.athleteName}</dd>
-              </div>
-              <div>
-                <dt>Intervals.icu ID</dt>
-                <dd>{connection.athleteId}</dd>
-              </div>
-              <div>
-                <dt>Permission</dt>
-                <dd>
-                  <code>ACTIVITY:READ</code>
-                </dd>
-              </div>
-              <div>
-                <dt>Connected</dt>
-                <dd>
-                  {new Intl.DateTimeFormat(undefined, {
-                    dateStyle: "medium",
-                  }).format(connection.connectedAt)}
-                </dd>
-              </div>
-            </dl>
-            <p className="integration-copy">
-              Reconnect to replace the current credential or restore access
-              after Intervals.icu invalidates it.
-            </p>
-            <div className="integration-actions">
-              <a
-                className="button-primary"
-                href="/api/integrations/intervals/connect"
-              >
-                Reconnect
-              </a>
-              <button
-                className="button-danger"
-                disabled={isDisconnecting}
-                onClick={onDisconnect}
-                type="button"
-              >
-                {isDisconnecting ? "Disconnecting..." : "Disconnect"}
-              </button>
-            </div>
-            <p className="revocation-note">
-              Disconnect removes the credential from FuelPace only. You can also
-              revoke FuelPace from your Intervals.icu settings.
-            </p>
-          </div>
         ) : (
           <div className="connection-details">
-            <p className="integration-copy">
-              Connect your athlete account so FuelPace can read completed
-              training activities. FuelPace requests read-only activity access
-              and cannot change your Intervals.icu data.
+            {connection ? (
+              <>
+                <dl>
+                  <div>
+                    <dt>Athlete</dt>
+                    <dd>{connection.athleteName}</dd>
+                  </div>
+                  <div>
+                    <dt>Intervals.icu ID</dt>
+                    <dd>{connection.athleteId}</dd>
+                  </div>
+                  <div>
+                    <dt>Connected</dt>
+                    <dd>
+                      {new Intl.DateTimeFormat(undefined, {
+                        dateStyle: "medium",
+                      }).format(connection.connectedAt)}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="integration-copy">
+                  Submit a new API key below to replace the stored credential.
+                </p>
+              </>
+            ) : (
+              <p className="integration-copy">
+                Add an API key so FuelPace can access your Intervals.icu
+                training data. This key grants account-level API access, not a
+                limited or read-only permission.
+              </p>
+            )}
+
+            <form className="api-key-form" onSubmit={handleConnect}>
+              <label htmlFor="intervals-api-key">Intervals.icu API key</label>
+              <input
+                autoComplete="new-password"
+                id="intervals-api-key"
+                name="intervalsApiKey"
+                onChange={(event) => setApiKey(event.target.value)}
+                required
+                type="password"
+                value={apiKey}
+              />
+              <p className="field-help">
+                Generate or copy your key in{" "}
+                <a href={INTERVALS_DEVELOPER_SETTINGS_URL}>
+                  Intervals.icu Developer Settings
+                </a>
+                .
+              </p>
+              <div className="integration-actions">
+                <button
+                  className="button-primary"
+                  disabled={isConnecting || isDisconnecting}
+                  type="submit"
+                >
+                  {isConnecting
+                    ? "Connecting..."
+                    : connection
+                      ? "Replace API key"
+                      : "Connect Intervals.icu"}
+                </button>
+                {connection ? (
+                  <button
+                    className="button-danger"
+                    disabled={isConnecting || isDisconnecting}
+                    onClick={handleDisconnect}
+                    type="button"
+                  >
+                    {isDisconnecting ? "Disconnecting..." : "Disconnect"}
+                  </button>
+                ) : null}
+              </div>
+            </form>
+
+            <p className="revocation-note">
+              Treat this API key as an account-wide credential. If it is
+              compromised, revoke or regenerate it in Intervals.icu.
+              Disconnecting removes it from FuelPace only.
             </p>
-            <div className="permission-line">
-              <span aria-hidden="true">Read only</span>
-              <code>ACTIVITY:READ</code>
-            </div>
-            <a
-              className="button-primary"
-              href="/api/integrations/intervals/connect"
-            >
-              Connect Intervals.icu
-            </a>
           </div>
         )}
 

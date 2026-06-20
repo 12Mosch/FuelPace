@@ -2,34 +2,29 @@ Welcome to your new TanStack Start app!
 
 # Getting Started
 
-## Intervals.icu OAuth configuration
+## Intervals.icu API key configuration
 
-Register FuelPace as an Intervals.icu OAuth application with the
-`ACTIVITY:READ` scope and these callback URLs:
+Each FuelPace user supplies an API key from their Intervals.icu
+[Developer Settings](https://intervals.icu/settings). FuelPace
+validates the key against athlete `0`, encrypts it with AES-256-GCM, and stores
+the resolved athlete identity with the encrypted credential.
 
-- Development: `http://localhost:3000/api/integrations/intervals/callback`
-- Production: `https://<production-origin>/api/integrations/intervals/callback`
-
-Set these variables in the TanStack Start server environment. They are
-server-only and must not use a `VITE_` prefix:
-
-```bash
-INTERVALS_CLIENT_ID=...
-INTERVALS_REDIRECT_URI=http://localhost:3000/api/integrations/intervals/callback
-```
-
-Set these variables on each Convex deployment (for example with
+Set the encryption key on each Convex deployment (for example with
 `bunx convex env set NAME VALUE`):
 
 ```bash
-INTERVALS_CLIENT_ID=...
-INTERVALS_CLIENT_SECRET=...
 INTEGRATIONS_ENCRYPTION_KEY=... # base64-encoded 32-byte AES key
 ```
 
 Generate an encryption key with `openssl rand -base64 32`. Use a separate key
 per environment and retain it securely; losing it makes stored credentials
 unreadable.
+
+An Intervals.icu API key grants account-level API access and must be revoked or
+regenerated in Intervals.icu if compromised. Intervals.icu recommends OAuth for
+multi-user applications; this implementation intentionally uses encrypted,
+per-user API keys because FuelPace needs persistent credentials for background
+synchronization.
 
 To run this application:
 
