@@ -2,6 +2,35 @@ Welcome to your new TanStack Start app!
 
 # Getting Started
 
+## Intervals.icu OAuth configuration
+
+Register FuelPace as an Intervals.icu OAuth application with the
+`ACTIVITY:READ` scope and these callback URLs:
+
+- Development: `http://localhost:3000/api/integrations/intervals/callback`
+- Production: `https://<production-origin>/api/integrations/intervals/callback`
+
+Set these variables in the TanStack Start server environment. They are
+server-only and must not use a `VITE_` prefix:
+
+```bash
+INTERVALS_CLIENT_ID=...
+INTERVALS_REDIRECT_URI=http://localhost:3000/api/integrations/intervals/callback
+```
+
+Set these variables on each Convex deployment (for example with
+`bunx convex env set NAME VALUE`):
+
+```bash
+INTERVALS_CLIENT_ID=...
+INTERVALS_CLIENT_SECRET=...
+INTEGRATIONS_ENCRYPTION_KEY=... # base64-encoded 32-byte AES key
+```
+
+Generate an encryption key with `openssl rand -base64 32`. Use a separate key
+per environment and retain it securely; losing it makes stored credentials
+unreadable.
+
 To run this application:
 
 ```bash

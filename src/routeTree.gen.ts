@@ -9,11 +9,19 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiAuthSignUpRouteImport } from './routes/api/auth/sign-up'
 import { Route as ApiAuthSignInRouteImport } from './routes/api/auth/sign-in'
 import { Route as ApiAuthCallbackRouteImport } from './routes/api/auth/callback'
+import { Route as ApiIntegrationsIntervalsConnectRouteImport } from './routes/api/integrations/intervals/connect'
+import { Route as ApiIntegrationsIntervalsCallbackRouteImport } from './routes/api/integrations/intervals/callback'
 
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -34,52 +42,96 @@ const ApiAuthCallbackRoute = ApiAuthCallbackRouteImport.update({
   path: '/api/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiIntegrationsIntervalsConnectRoute =
+  ApiIntegrationsIntervalsConnectRouteImport.update({
+    id: '/api/integrations/intervals/connect',
+    path: '/api/integrations/intervals/connect',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiIntegrationsIntervalsCallbackRoute =
+  ApiIntegrationsIntervalsCallbackRouteImport.update({
+    id: '/api/integrations/intervals/callback',
+    path: '/api/integrations/intervals/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/api/auth/callback': typeof ApiAuthCallbackRoute
   '/api/auth/sign-in': typeof ApiAuthSignInRoute
   '/api/auth/sign-up': typeof ApiAuthSignUpRoute
+  '/api/integrations/intervals/callback': typeof ApiIntegrationsIntervalsCallbackRoute
+  '/api/integrations/intervals/connect': typeof ApiIntegrationsIntervalsConnectRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/api/auth/callback': typeof ApiAuthCallbackRoute
   '/api/auth/sign-in': typeof ApiAuthSignInRoute
   '/api/auth/sign-up': typeof ApiAuthSignUpRoute
+  '/api/integrations/intervals/callback': typeof ApiIntegrationsIntervalsCallbackRoute
+  '/api/integrations/intervals/connect': typeof ApiIntegrationsIntervalsConnectRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/api/auth/callback': typeof ApiAuthCallbackRoute
   '/api/auth/sign-in': typeof ApiAuthSignInRoute
   '/api/auth/sign-up': typeof ApiAuthSignUpRoute
+  '/api/integrations/intervals/callback': typeof ApiIntegrationsIntervalsCallbackRoute
+  '/api/integrations/intervals/connect': typeof ApiIntegrationsIntervalsConnectRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/settings'
     | '/api/auth/callback'
     | '/api/auth/sign-in'
     | '/api/auth/sign-up'
+    | '/api/integrations/intervals/callback'
+    | '/api/integrations/intervals/connect'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/auth/callback' | '/api/auth/sign-in' | '/api/auth/sign-up'
+  to:
+    | '/'
+    | '/settings'
+    | '/api/auth/callback'
+    | '/api/auth/sign-in'
+    | '/api/auth/sign-up'
+    | '/api/integrations/intervals/callback'
+    | '/api/integrations/intervals/connect'
   id:
     | '__root__'
     | '/'
+    | '/settings'
     | '/api/auth/callback'
     | '/api/auth/sign-in'
     | '/api/auth/sign-up'
+    | '/api/integrations/intervals/callback'
+    | '/api/integrations/intervals/connect'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SettingsRoute: typeof SettingsRoute
   ApiAuthCallbackRoute: typeof ApiAuthCallbackRoute
   ApiAuthSignInRoute: typeof ApiAuthSignInRoute
   ApiAuthSignUpRoute: typeof ApiAuthSignUpRoute
+  ApiIntegrationsIntervalsCallbackRoute: typeof ApiIntegrationsIntervalsCallbackRoute
+  ApiIntegrationsIntervalsConnectRoute: typeof ApiIntegrationsIntervalsConnectRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -108,14 +160,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/integrations/intervals/connect': {
+      id: '/api/integrations/intervals/connect'
+      path: '/api/integrations/intervals/connect'
+      fullPath: '/api/integrations/intervals/connect'
+      preLoaderRoute: typeof ApiIntegrationsIntervalsConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/integrations/intervals/callback': {
+      id: '/api/integrations/intervals/callback'
+      path: '/api/integrations/intervals/callback'
+      fullPath: '/api/integrations/intervals/callback'
+      preLoaderRoute: typeof ApiIntegrationsIntervalsCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SettingsRoute: SettingsRoute,
   ApiAuthCallbackRoute: ApiAuthCallbackRoute,
   ApiAuthSignInRoute: ApiAuthSignInRoute,
   ApiAuthSignUpRoute: ApiAuthSignUpRoute,
+  ApiIntegrationsIntervalsCallbackRoute: ApiIntegrationsIntervalsCallbackRoute,
+  ApiIntegrationsIntervalsConnectRoute: ApiIntegrationsIntervalsConnectRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
