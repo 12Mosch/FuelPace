@@ -9,17 +9,26 @@ import {
   waitFor,
 } from "@testing-library/react"
 import { afterEach, describe, expect, test, vi } from "vitest"
-import { IntervalsCardView, requireSettingsUser } from "./settings"
+import {
+  type Connection,
+  IntervalsCardView,
+  requireSettingsUser,
+} from "./settings"
 
 const connected = {
   athleteId: "12345",
   athleteName: "Ada Rider",
   connectedAt: Date.UTC(2026, 0, 2),
   updatedAt: Date.UTC(2026, 0, 2),
+  syncStatus: "ready" as const,
+  lastSuccessfulSyncAt: Date.UTC(2026, 0, 2),
+  importedProfileCount: 1,
+  importedPlannedWorkoutCount: 4,
+  importedActivityCount: 12,
 }
 
 function renderCard(
-  connection: typeof connected | null | undefined,
+  connection: Connection | null | undefined,
   onConnect = vi.fn().mockResolvedValue(undefined),
   onDisconnect = vi.fn().mockResolvedValue(undefined),
 ) {
@@ -73,11 +82,40 @@ describe("settings route", () => {
 
   test("renders connected identity and replacement controls", () => {
     renderCard(connected)
-    expect(screen.getAllByText("Connected")).toHaveLength(2)
+    expect(screen.getByText("Up to date")).toBeTruthy()
     expect(screen.getByText("Ada Rider")).toBeTruthy()
     expect(screen.getByText("12345")).toBeTruthy()
     expect(screen.getByRole("button", { name: "Replace API key" })).toBeTruthy()
     expect(screen.getByRole("button", { name: "Disconnect" })).toBeTruthy()
+  })
+
+  test.each([
+    ["queued", "Refresh queued", "refresh is queued"],
+    ["importing", "Importing", "Importing your latest"],
+    ["never_synced", "Awaiting import", "not completed its first import"],
+  ] as const)("renders the %s sync state", (syncStatus, label, detail) => {
+    renderCard({
+      ...connected,
+      syncStatus,
+      lastSuccessfulSyncAt:
+        syncStatus === "never_synced"
+          ? undefined
+          : connected.lastSuccessfulSyncAt,
+    })
+    expect(screen.getByText(label)).toBeTruthy()
+    expect(screen.getByText(new RegExp(detail))).toBeTruthy()
+  })
+
+  test("explains that a failed refresh preserves existing data", () => {
+    renderCard({
+      ...connected,
+      syncStatus: "error",
+      lastSyncErrorCode: "INVALID_RESPONSE",
+    })
+    expect(screen.getByText("Refresh failed")).toBeTruthy()
+    expect(
+      screen.getByText(/previously imported data remains available/),
+    ).toBeTruthy()
   })
 
   test("shows connecting state and clears the key after success", async () => {

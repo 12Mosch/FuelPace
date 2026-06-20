@@ -174,6 +174,28 @@ a {
   background: #e7e5de;
   color: #60645e;
 }
+.status-syncing {
+  background: #e9e4c8;
+  color: #655b24;
+}
+.status-error {
+  background: #f1dcd7;
+  color: #873c32;
+}
+.sync-note {
+  max-width: 43rem;
+  margin: -0.5rem 0 1.5rem;
+  padding: 0.8rem 1rem;
+  border-left: 3px solid #9baa68;
+  background: #f2f2e8;
+  color: #4f5e53;
+  line-height: 1.5;
+}
+.sync-note-error {
+  border-left-color: #a95c52;
+  background: #f7ebe8;
+  color: #74382f;
+}
 .connection-details {
   padding-top: 1.75rem;
 }

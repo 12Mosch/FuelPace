@@ -1,7 +1,10 @@
 import { ConvexError } from "convex/values"
 import { describe, expect, test, vi } from "vitest"
 import {
+  buildActivitiesUrl,
+  buildEventsUrl,
   buildIntervalsBasicAuthorization,
+  fetchIntervalsJson,
   validateIntervalsApiKey,
 } from "./intervalsNode"
 
@@ -96,5 +99,76 @@ describe("Intervals API key validation", () => {
         expect(String(error)).not.toContain("never-leak")
       }
     }
+  })
+
+  test("builds bounded activity and event requests with explicit fields", () => {
+    const activities = new URL(
+      buildActivitiesUrl("i 123", "2026-01-01", "2026-01-30"),
+    )
+    expect(activities.pathname).toBe("/api/v1/athlete/i%20123/activities")
+    expect(activities.searchParams.get("oldest")).toBe("2026-01-01")
+    expect(activities.searchParams.get("newest")).toBe("2026-01-30")
+    expect(activities.searchParams.get("fields")?.split(",")).toEqual(
+      expect.arrayContaining([
+        "id",
+        "start_date",
+        "icu_distance",
+        "carbs_ingested",
+        "paired_event_id",
+      ]),
+    )
+
+    const events = new URL(buildEventsUrl("i123", "2026-01-01", "2026-01-30"))
+    expect(events.pathname).toBe("/api/v1/athlete/i123/events")
+    expect(events.searchParams.get("category")).toBe(
+      "WORKOUT,RACE_A,RACE_B,RACE_C",
+    )
+  })
+
+  test("retries rate limits, server failures, and network errors", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new TypeError("offline"))
+      .mockResolvedValueOnce(
+        new Response(null, { status: 429, headers: { "Retry-After": "1" } }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      )
+    const sleep = vi.fn().mockResolvedValue(undefined)
+    await expect(
+      fetchIntervalsJson("https://example.test", "secret", fetcher, sleep),
+    ).resolves.toEqual({ ok: true })
+    expect(fetcher).toHaveBeenCalledTimes(3)
+    expect(sleep).toHaveBeenNthCalledWith(1, 250)
+    expect(sleep).toHaveBeenNthCalledWith(2, 1000)
+  })
+
+  test("does not retry authentication or malformed JSON", async () => {
+    for (const response of [
+      new Response(null, { status: 401 }),
+      new Response("invalid", { status: 200 }),
+    ]) {
+      const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response)
+      await expect(
+        fetchIntervalsJson("https://example.test", "secret", fetcher),
+      ).rejects.toBeInstanceOf(ConvexError)
+      expect(fetcher).toHaveBeenCalledTimes(1)
+    }
+  })
+
+  test("stops after the initial request and three retries", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 503 }))
+    await expect(
+      fetchIntervalsJson(
+        "https://example.test",
+        "secret",
+        fetcher,
+        vi.fn().mockResolvedValue(undefined),
+      ),
+    ).rejects.toBeInstanceOf(ConvexError)
+    expect(fetcher).toHaveBeenCalledTimes(4)
   })
 })

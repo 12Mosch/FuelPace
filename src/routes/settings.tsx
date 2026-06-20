@@ -73,9 +73,32 @@ export function IntervalsCard() {
   )
 }
 
-type Connection = NonNullable<
+export type Connection = NonNullable<
   FunctionReturnType<typeof api.intervals.getConnection>
 >
+
+const SYNC_ERROR_MESSAGES: Record<string, string> = {
+  INVALID_API_KEY: "The saved Intervals.icu credential is no longer valid.",
+  INTERVALS_UNAVAILABLE: "Intervals.icu could not be reached during refresh.",
+  INVALID_RESPONSE: "Intervals.icu returned data FuelPace could not import.",
+  STALE_IMPORT: "A newer connection replaced this refresh.",
+}
+
+function formatSyncTime(value: number | undefined): string {
+  if (value === undefined) return "Not yet"
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(value)
+}
+
+function connectionStatusLabel(connection: Connection): string {
+  if (connection.syncStatus === "queued") return "Refresh queued"
+  if (connection.syncStatus === "importing") return "Importing"
+  if (connection.syncStatus === "error") return "Refresh failed"
+  if (connection.syncStatus === "never_synced") return "Awaiting import"
+  return "Up to date"
+}
 
 export function intervalsConnectionErrorMessage(error: unknown): string {
   const data =
@@ -155,9 +178,18 @@ export function IntervalsCardView({
             <span className="status-pill status-loading">Checking</span>
           ) : (
             <span
-              className={`status-pill ${connection ? "status-on" : "status-off"}`}
+              className={`status-pill ${
+                connection
+                  ? connection.syncStatus === "error"
+                    ? "status-error"
+                    : connection.syncStatus === "queued" ||
+                        connection.syncStatus === "importing"
+                      ? "status-syncing"
+                      : "status-on"
+                  : "status-off"
+              }`}
             >
-              {connection ? "Connected" : "Not connected"}
+              {connection ? connectionStatusLabel(connection) : "Not connected"}
             </span>
           )}
         </div>
@@ -187,7 +219,42 @@ export function IntervalsCardView({
                       }).format(connection.connectedAt)}
                     </dd>
                   </div>
+                  <div>
+                    <dt>Last refresh</dt>
+                    <dd>{formatSyncTime(connection.lastSuccessfulSyncAt)}</dd>
+                  </div>
+                  <div>
+                    <dt>Imported</dt>
+                    <dd>
+                      {connection.importedPlannedWorkoutCount} planned,{" "}
+                      {connection.importedActivityCount} completed
+                    </dd>
+                  </div>
                 </dl>
+                {connection.syncStatus === "queued" ? (
+                  <p className="sync-note" aria-live="polite">
+                    Your Intervals.icu refresh is queued.
+                  </p>
+                ) : null}
+                {connection.syncStatus === "importing" ? (
+                  <p className="sync-note" aria-live="polite">
+                    Importing your latest profile, workouts, and activities.
+                  </p>
+                ) : null}
+                {connection.syncStatus === "never_synced" ? (
+                  <p className="sync-note">
+                    FuelPace has not completed its first import yet.
+                  </p>
+                ) : null}
+                {connection.syncStatus === "error" ? (
+                  <p className="sync-note sync-note-error" role="status">
+                    {SYNC_ERROR_MESSAGES[connection.lastSyncErrorCode ?? ""] ??
+                      "The latest Intervals.icu refresh failed."}{" "}
+                    {connection.lastSuccessfulSyncAt !== undefined
+                      ? "Your previously imported data remains available."
+                      : "No Intervals.icu data has been imported yet."}
+                  </p>
+                ) : null}
                 <p className="integration-copy">
                   Submit a new API key below to replace the stored credential.
                 </p>
