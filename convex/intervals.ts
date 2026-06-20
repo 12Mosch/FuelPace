@@ -9,12 +9,18 @@ import {
   mutation,
   query,
 } from "./_generated/server"
+import type {
+  IntervalsActivity,
+  IntervalsPlannedWorkout,
+} from "./lib/intervals"
 
 const FRESHNESS_MS = 15 * 60 * 1000
 const FAILURE_COOLDOWN_MS = 5 * 60 * 1000
 const QUEUED_LEASE_MS = 2 * 60 * 1000
 const RUNNING_LEASE_MS = 15 * 60 * 1000
 const DELETE_BATCH_SIZE = 100
+const CALENDAR_MONTH_LIMIT = 500
+const MONTH_PATTERN = /^(\d{4})-(\d{2})$/
 
 const syncStatus = v.union(
   v.literal("queued"),
@@ -53,6 +59,41 @@ type ConnectionSummary = {
   importedPlannedWorkoutCount: number
   importedActivityCount: number
 }
+
+type CalendarSyncSummary = {
+  syncStatus: SyncStatus
+  lastSyncAttemptAt?: number
+  lastSuccessfulSyncAt?: number
+  lastSyncErrorCode?: string
+}
+
+type CalendarQueryResult =
+  | {
+      state: "disconnected"
+      syncStatus: "never_synced"
+      plannedWorkouts: IntervalsPlannedWorkout[]
+      activities: Array<Omit<IntervalsActivity, "startAt">>
+      truncated: boolean
+    }
+  | ({
+      state: "awaiting_first_import"
+      plannedWorkouts: IntervalsPlannedWorkout[]
+      activities: Array<Omit<IntervalsActivity, "startAt">>
+      truncated: boolean
+    } & CalendarSyncSummary)
+  | ({
+      state: "available"
+      timezone: string
+      locale?: string
+      importedWindow: {
+        oldestLocalDate: string
+        newestLocalDate: string
+        activitiesThroughAt: number
+      }
+      plannedWorkouts: IntervalsPlannedWorkout[]
+      activities: Array<Omit<IntervalsActivity, "startAt">>
+      truncated: boolean
+    } & CalendarSyncSummary)
 
 type EncryptedConnection = {
   athleteId: string
@@ -126,6 +167,40 @@ const activityValidator = v.object({
   isPrivate: v.optional(v.boolean()),
 })
 
+const calendarActivityValidator = v.object({
+  sourceActivityId: v.string(),
+  localStartDateTime: v.string(),
+  sport: v.string(),
+  name: v.optional(v.string()),
+  description: v.optional(v.string()),
+  movingTimeSeconds: v.optional(v.number()),
+  elapsedTimeSeconds: v.optional(v.number()),
+  distanceMetres: v.optional(v.number()),
+  caloriesKilocalories: v.optional(v.number()),
+  trainingLoad: v.optional(v.number()),
+  intensity: v.optional(v.number()),
+  workJoules: v.optional(v.number()),
+  carbohydratesUsedGrams: v.optional(v.number()),
+  carbohydratesIntakeGrams: v.optional(v.number()),
+  averageHeartRate: v.optional(v.number()),
+  maxHeartRate: v.optional(v.number()),
+  averagePowerWatts: v.optional(v.number()),
+  weightedAveragePowerWatts: v.optional(v.number()),
+  source: v.optional(v.string()),
+  pairedEventId: v.optional(v.string()),
+  isCommute: v.optional(v.boolean()),
+  isIndoor: v.optional(v.boolean()),
+  isManual: v.optional(v.boolean()),
+  isPrivate: v.optional(v.boolean()),
+})
+
+const calendarSyncFields = {
+  syncStatus,
+  lastSyncAttemptAt: v.optional(v.number()),
+  lastSuccessfulSyncAt: v.optional(v.number()),
+  lastSyncErrorCode: v.optional(v.string()),
+}
+
 async function requireOwner(ctx: {
   auth: { getUserIdentity: () => Promise<{ tokenIdentifier: string } | null> }
 }) {
@@ -175,6 +250,234 @@ function summarize(
     importedActivityCount: state.activityCount,
   }
 }
+
+function nextMonth(month: string): string {
+  const match = MONTH_PATTERN.exec(month)
+  if (!match) throw new ConvexError({ code: "INVALID_MONTH" })
+  const year = Number(match[1])
+  const monthNumber = Number(match[2])
+  if (year < 1 || year > 9999 || monthNumber < 1 || monthNumber > 12) {
+    throw new ConvexError({ code: "INVALID_MONTH" })
+  }
+  const nextYear = monthNumber === 12 ? year + 1 : year
+  if (nextYear > 9999) throw new ConvexError({ code: "INVALID_MONTH" })
+  const nextMonthNumber = monthNumber === 12 ? 1 : monthNumber + 1
+  return `${String(nextYear).padStart(4, "0")}-${String(nextMonthNumber).padStart(2, "0")}`
+}
+
+export const getCalendarMonth = query({
+  args: { month: v.string() },
+  returns: v.union(
+    v.object({
+      state: v.literal("disconnected"),
+      syncStatus: v.literal("never_synced"),
+      plannedWorkouts: v.array(plannedWorkoutValidator),
+      activities: v.array(calendarActivityValidator),
+      truncated: v.boolean(),
+    }),
+    v.object({
+      state: v.literal("awaiting_first_import"),
+      ...calendarSyncFields,
+      plannedWorkouts: v.array(plannedWorkoutValidator),
+      activities: v.array(calendarActivityValidator),
+      truncated: v.boolean(),
+    }),
+    v.object({
+      state: v.literal("available"),
+      ...calendarSyncFields,
+      timezone: v.string(),
+      locale: v.optional(v.string()),
+      importedWindow: v.object({
+        oldestLocalDate: v.string(),
+        newestLocalDate: v.string(),
+        activitiesThroughAt: v.number(),
+      }),
+      plannedWorkouts: v.array(plannedWorkoutValidator),
+      activities: v.array(calendarActivityValidator),
+      truncated: v.boolean(),
+    }),
+  ),
+  handler: async (ctx, { month }): Promise<CalendarQueryResult> => {
+    const followingMonth = nextMonth(month)
+    const ownerTokenIdentifier = await requireOwner(ctx)
+    const connection = await ctx.db
+      .query("intervalsConnections")
+      .withIndex("by_ownerTokenIdentifier", (q) =>
+        q.eq("ownerTokenIdentifier", ownerTokenIdentifier),
+      )
+      .unique()
+    const state = await ctx.db
+      .query("intervalsSyncStates")
+      .withIndex("by_ownerTokenIdentifier", (q) =>
+        q.eq("ownerTokenIdentifier", ownerTokenIdentifier),
+      )
+      .unique()
+
+    if (
+      !connection?.connectionVersion ||
+      !state ||
+      state.connectionVersion !== connection.connectionVersion
+    ) {
+      return {
+        state: "disconnected" as const,
+        syncStatus: "never_synced" as const,
+        plannedWorkouts: [],
+        activities: [],
+        truncated: false,
+      }
+    }
+
+    const syncSummary = {
+      syncStatus: publicSyncStatus(state),
+      lastSyncAttemptAt: state.lastSyncAttemptAt,
+      lastSuccessfulSyncAt: state.lastSuccessfulSyncAt,
+      lastSyncErrorCode: state.lastSyncErrorCode,
+    }
+    if (!state.activeImportRunId) {
+      return {
+        state: "awaiting_first_import" as const,
+        ...syncSummary,
+        plannedWorkouts: [],
+        activities: [],
+        truncated: false,
+      }
+    }
+
+    const activeImportRunId = state.activeImportRunId
+    const run = await ctx.db.get(activeImportRunId)
+    if (
+      run?.status !== "completed" ||
+      run.ownerTokenIdentifier !== ownerTokenIdentifier ||
+      run.connectionVersion !== connection.connectionVersion
+    ) {
+      return {
+        state: "awaiting_first_import" as const,
+        ...syncSummary,
+        plannedWorkouts: [],
+        activities: [],
+        truncated: false,
+      }
+    }
+
+    const [profile, plannedRows, activityRows] = await Promise.all([
+      ctx.db
+        .query("intervalsProfiles")
+        .withIndex("by_importRunId", (q) =>
+          q.eq("importRunId", activeImportRunId),
+        )
+        .unique(),
+      ctx.db
+        .query("intervalsPlannedWorkouts")
+        .withIndex("by_importRunId_and_localStartDate", (q) =>
+          q
+            .eq("importRunId", activeImportRunId)
+            .gte("localStartDate", `${month}-01`)
+            .lt("localStartDate", `${followingMonth}-01`),
+        )
+        .take(CALENDAR_MONTH_LIMIT + 1),
+      ctx.db
+        .query("intervalsActivities")
+        .withIndex("by_importRunId_and_localStartDateTime", (q) =>
+          q
+            .eq("importRunId", activeImportRunId)
+            .gte("localStartDateTime", `${month}-01`)
+            .lt("localStartDateTime", `${followingMonth}-01`),
+        )
+        .take(CALENDAR_MONTH_LIMIT + 1),
+    ])
+    if (!profile) throw new Error("Active import profile is missing")
+
+    const combined = [
+      ...plannedRows.map((row) => ({ kind: "planned" as const, row })),
+      ...activityRows.map((row) => ({ kind: "activity" as const, row })),
+    ]
+      .sort((left, right) => {
+        const leftDate =
+          left.kind === "planned"
+            ? left.row.localStartDate
+            : left.row.localStartDateTime
+        const rightDate =
+          right.kind === "planned"
+            ? right.row.localStartDate
+            : right.row.localStartDateTime
+        return leftDate.localeCompare(rightDate)
+      })
+      .slice(0, CALENDAR_MONTH_LIMIT)
+
+    const plannedWorkouts = combined.flatMap((entry) =>
+      entry.kind === "planned"
+        ? [
+            {
+              sourceEventId: entry.row.sourceEventId,
+              category: entry.row.category,
+              sport: entry.row.sport,
+              localStartDate: entry.row.localStartDate,
+              localEndDate: entry.row.localEndDate,
+              name: entry.row.name,
+              description: entry.row.description,
+              durationSeconds: entry.row.durationSeconds,
+              distanceMetres: entry.row.distanceMetres,
+              trainingLoad: entry.row.trainingLoad,
+              intensity: entry.row.intensity,
+              workJoules: entry.row.workJoules,
+              carbohydratesUsedGrams: entry.row.carbohydratesUsedGrams,
+              carbohydratesIntakeGrams: entry.row.carbohydratesIntakeGrams,
+              isIndoor: entry.row.isIndoor,
+              targetType: entry.row.targetType,
+            },
+          ]
+        : [],
+    )
+    const activities = combined.flatMap((entry) =>
+      entry.kind === "activity"
+        ? [
+            {
+              sourceActivityId: entry.row.sourceActivityId,
+              localStartDateTime: entry.row.localStartDateTime,
+              sport: entry.row.sport,
+              name: entry.row.name,
+              description: entry.row.description,
+              movingTimeSeconds: entry.row.movingTimeSeconds,
+              elapsedTimeSeconds: entry.row.elapsedTimeSeconds,
+              distanceMetres: entry.row.distanceMetres,
+              caloriesKilocalories: entry.row.caloriesKilocalories,
+              trainingLoad: entry.row.trainingLoad,
+              intensity: entry.row.intensity,
+              workJoules: entry.row.workJoules,
+              carbohydratesUsedGrams: entry.row.carbohydratesUsedGrams,
+              carbohydratesIntakeGrams: entry.row.carbohydratesIntakeGrams,
+              averageHeartRate: entry.row.averageHeartRate,
+              maxHeartRate: entry.row.maxHeartRate,
+              averagePowerWatts: entry.row.averagePowerWatts,
+              weightedAveragePowerWatts: entry.row.weightedAveragePowerWatts,
+              source: entry.row.source,
+              pairedEventId: entry.row.pairedEventId,
+              isCommute: entry.row.isCommute,
+              isIndoor: entry.row.isIndoor,
+              isManual: entry.row.isManual,
+              isPrivate: entry.row.isPrivate,
+            },
+          ]
+        : [],
+    )
+
+    return {
+      state: "available" as const,
+      ...syncSummary,
+      timezone: profile.timezone,
+      locale: profile.locale,
+      importedWindow: {
+        oldestLocalDate: run.windowOldestLocalDate,
+        newestLocalDate: run.windowNewestLocalDate,
+        activitiesThroughAt: run.activitiesThroughAt,
+      },
+      plannedWorkouts,
+      activities,
+      truncated:
+        plannedRows.length + activityRows.length > CALENDAR_MONTH_LIMIT,
+    }
+  },
+})
 
 export const getConnection = query({
   args: {},

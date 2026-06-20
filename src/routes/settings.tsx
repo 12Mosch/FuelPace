@@ -1,8 +1,9 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router"
+import { createFileRoute, Link } from "@tanstack/react-router"
 import { useAction, useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 import { type FormEvent, useState } from "react"
 import { api } from "../../convex/_generated/api"
+import { requireRouteUser } from "../lib/route-auth"
 
 const INTERVALS_DEVELOPER_SETTINGS_URL = "https://intervals.icu/settings"
 
@@ -15,9 +16,7 @@ export const Route = createFileRoute("/settings")({
 })
 
 export function requireSettingsUser(user: unknown) {
-  if (!user) {
-    throw redirect({ href: "/api/auth/sign-in?returnPathname=/settings" })
-  }
+  requireRouteUser(user, "/settings")
 }
 
 function SettingsError() {

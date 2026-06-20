@@ -138,5 +138,9 @@ export default defineSchema({
       "importRunId",
       "sourceActivityId",
     ])
-    .index("by_importRunId_and_startAt", ["importRunId", "startAt"]),
+    .index("by_importRunId_and_startAt", ["importRunId", "startAt"])
+    .index("by_importRunId_and_localStartDateTime", [
+      "importRunId",
+      "localStartDateTime",
+    ]),
 })
