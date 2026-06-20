@@ -11,10 +11,9 @@ const identityB = { subject: "user-b", tokenIdentifier: "workos|user-b" }
 const credential = {
   athleteId: "athlete-1",
   athleteName: "Ada Rider",
-  encryptedAccessToken: "ciphertext",
+  encryptedApiKey: "ciphertext",
   encryptionIv: "iv",
   encryptionVersion: "aes-256-gcm-v1" as const,
-  grantedScopes: ["ACTIVITY:READ"],
 }
 
 describe("Intervals connections", () => {
@@ -27,7 +26,7 @@ describe("Intervals connections", () => {
       "Not authenticated",
     )
     await expect(
-      t.action(api.intervals.completeOAuth, { code: "unused" }),
+      t.action(api.intervals.connectWithApiKey, { apiKey: "unused" }),
     ).rejects.toThrow("Not authenticated")
   })
 
@@ -44,9 +43,8 @@ describe("Intervals connections", () => {
     expect(result).toMatchObject({
       athleteId: "athlete-1",
       athleteName: "Ada Rider",
-      grantedScopes: ["ACTIVITY:READ"],
     })
-    expect(result).not.toHaveProperty("encryptedAccessToken")
+    expect(result).not.toHaveProperty("encryptedApiKey")
     expect(result).not.toHaveProperty("encryptionIv")
     expect(
       await t.withIdentity(identityB).query(api.intervals.getConnection, {}),
@@ -64,7 +62,7 @@ describe("Intervals connections", () => {
       ...credential,
       athleteId: "athlete-2",
       athleteName: "New Name",
-      encryptedAccessToken: "new-ciphertext",
+      encryptedApiKey: "new-ciphertext",
     })
 
     expect(second.connectedAt).toBe(first.connectedAt)
@@ -73,7 +71,7 @@ describe("Intervals connections", () => {
       ctx.db.query("intervalsConnections").collect(),
     )
     expect(documents).toHaveLength(1)
-    expect(documents[0]?.encryptedAccessToken).toBe("new-ciphertext")
+    expect(documents[0]?.encryptedApiKey).toBe("new-ciphertext")
   })
 
   test("disconnect is owner-scoped and idempotent", async () => {

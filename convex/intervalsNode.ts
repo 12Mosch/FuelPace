@@ -1,49 +1,76 @@
 "use node"
 
-import { v } from "convex/values"
+import { ConvexError, v } from "convex/values"
 import { internalAction } from "./_generated/server"
 import { encryptCredential } from "./lib/credentialCrypto"
-import { parseIntervalsTokenResponse } from "./lib/intervals"
+import {
+  type IntervalsAthlete,
+  parseIntervalsAthleteResponse,
+} from "./lib/intervals"
 
-const TOKEN_ENDPOINT = "https://intervals.icu/api/oauth/token"
-const EXCHANGE_TIMEOUT_MS = 10_000
+const ATHLETE_ENDPOINT = "https://intervals.icu/api/v1/athlete/0"
+const VALIDATION_TIMEOUT_MS = 10_000
 
-export const exchangeAndEncrypt = internalAction({
-  args: { code: v.string() },
-  handler: async (_ctx, { code }) => {
-    const clientId = process.env.INTERVALS_CLIENT_ID
-    const clientSecret = process.env.INTERVALS_CLIENT_SECRET
-    if (!clientId)
-      throw new Error("Missing INTERVALS_CLIENT_ID environment variable")
-    if (!clientSecret) {
-      throw new Error("Missing INTERVALS_CLIENT_SECRET environment variable")
-    }
-    if (!process.env.INTEGRATIONS_ENCRYPTION_KEY) {
-      throw new Error(
-        "Missing INTEGRATIONS_ENCRYPTION_KEY environment variable",
-      )
-    }
+type IntervalsErrorCode =
+  | "INVALID_API_KEY"
+  | "INTERVALS_UNAVAILABLE"
+  | "INVALID_RESPONSE"
 
-    const response = await fetch(TOKEN_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-      }),
-      signal: AbortSignal.timeout(EXCHANGE_TIMEOUT_MS),
+function intervalsError(
+  code: IntervalsErrorCode,
+): ConvexError<{ code: string }> {
+  return new ConvexError({ code })
+}
+
+export function buildIntervalsBasicAuthorization(apiKey: string): string {
+  return `Basic ${Buffer.from(`API_KEY:${apiKey}`, "utf8").toString("base64")}`
+}
+
+export async function validateIntervalsApiKey(
+  apiKey: string,
+  fetcher: typeof fetch = fetch,
+): Promise<IntervalsAthlete> {
+  let response: Response
+  try {
+    response = await fetcher(ATHLETE_ENDPOINT, {
+      headers: { Authorization: buildIntervalsBasicAuthorization(apiKey) },
+      signal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
     })
-    if (!response.ok) {
-      throw new Error("Intervals.icu token exchange failed")
-    }
+  } catch {
+    throw intervalsError("INTERVALS_UNAVAILABLE")
+  }
 
-    const token = parseIntervalsTokenResponse(await response.json())
+  if (response.status === 401 || response.status === 403) {
+    throw intervalsError("INVALID_API_KEY")
+  }
+  if (response.status === 429 || response.status >= 500 || !response.ok) {
+    throw intervalsError("INTERVALS_UNAVAILABLE")
+  }
+
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch {
+    throw intervalsError("INVALID_RESPONSE")
+  }
+
+  try {
+    return parseIntervalsAthleteResponse(body)
+  } catch {
+    throw intervalsError("INVALID_RESPONSE")
+  }
+}
+
+export const validateAndEncrypt = internalAction({
+  args: { apiKey: v.string() },
+  handler: async (_ctx, { apiKey }) => {
+    const athlete = await validateIntervalsApiKey(apiKey)
+    const encrypted = encryptCredential(apiKey)
     return {
-      athleteId: token.athleteId,
-      athleteName: token.athleteName,
-      grantedScopes: token.grantedScopes,
-      ...encryptCredential(token.accessToken),
+      ...athlete,
+      encryptedApiKey: encrypted.ciphertext,
+      encryptionIv: encrypted.encryptionIv,
+      encryptionVersion: encrypted.encryptionVersion,
     }
   },
 })

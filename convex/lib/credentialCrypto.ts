@@ -5,7 +5,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto"
 export const ENCRYPTION_VERSION = "aes-256-gcm-v1" as const
 
 export type EncryptedCredential = {
-  encryptedAccessToken: string
+  ciphertext: string
   encryptionIv: string
   encryptionVersion: typeof ENCRYPTION_VERSION
 }
@@ -26,7 +26,7 @@ function readEncryptionKey(
 }
 
 export function encryptCredential(
-  accessToken: string,
+  plaintext: string,
   encodedKey?: string,
 ): EncryptedCredential {
   const iv = randomBytes(12)
@@ -36,12 +36,12 @@ export function encryptCredential(
     iv,
   )
   const ciphertext = Buffer.concat([
-    cipher.update(accessToken, "utf8"),
+    cipher.update(plaintext, "utf8"),
     cipher.final(),
   ])
   const payload = Buffer.concat([ciphertext, cipher.getAuthTag()])
   return {
-    encryptedAccessToken: payload.toString("base64"),
+    ciphertext: payload.toString("base64"),
     encryptionIv: iv.toString("base64"),
     encryptionVersion: ENCRYPTION_VERSION,
   }
@@ -54,7 +54,7 @@ export function decryptCredential(
   if (credential.encryptionVersion !== ENCRYPTION_VERSION) {
     throw new Error("Unsupported credential encryption version")
   }
-  const payload = Buffer.from(credential.encryptedAccessToken, "base64")
+  const payload = Buffer.from(credential.ciphertext, "base64")
   const iv = Buffer.from(credential.encryptionIv, "base64")
   if (iv.length !== 12 || payload.length <= 16) {
     throw new Error("Invalid encrypted credential")

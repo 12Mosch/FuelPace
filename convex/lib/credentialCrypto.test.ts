@@ -14,16 +14,16 @@ describe("Intervals credential encryption", () => {
     const first = encryptCredential("same-token", key)
     const second = encryptCredential("same-token", key)
     expect(first.encryptionIv).not.toBe(second.encryptionIv)
-    expect(first.encryptedAccessToken).not.toBe(second.encryptedAccessToken)
+    expect(first.ciphertext).not.toBe(second.ciphertext)
   })
 
   test("rejects tampered ciphertext", () => {
     const encrypted = encryptCredential("bearer-token", key)
-    const payload = Buffer.from(encrypted.encryptedAccessToken, "base64")
+    const payload = Buffer.from(encrypted.ciphertext, "base64")
     payload[0] ^= 1
     expect(() =>
       decryptCredential(
-        { ...encrypted, encryptedAccessToken: payload.toString("base64") },
+        { ...encrypted, ciphertext: payload.toString("base64") },
         key,
       ),
     ).toThrow()
