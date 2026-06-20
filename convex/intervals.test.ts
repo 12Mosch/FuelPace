@@ -385,3 +385,190 @@ describe("Intervals connections", () => {
     expect(state?.profileCount).toBe(0)
   })
 })
+
+async function seedCalendarSnapshot(
+  t: TestConvex<typeof schema>,
+  options: {
+    owner?: string
+    syncStatus?: "idle" | "queued" | "running" | "failed"
+  } = {},
+) {
+  const owner = options.owner ?? identityA.tokenIdentifier
+  return await t.run(async (ctx) => {
+    const connectionVersion = "calendar-version"
+    await ctx.db.insert("intervalsConnections", {
+      ownerTokenIdentifier: owner,
+      ...credential,
+      connectionVersion,
+      connectedAt: 1,
+      updatedAt: 1,
+    })
+    const importRunId = await ctx.db.insert("intervalsImportRuns", {
+      ownerTokenIdentifier: owner,
+      athleteId: credential.athleteId,
+      connectionVersion,
+      status: "completed",
+      windowOldestLocalDate: "2026-01-01",
+      windowNewestLocalDate: "2026-12-31",
+      activitiesThroughAt: 10,
+      startedAt: 1,
+      completedAt: 2,
+    })
+    await ctx.db.insert("intervalsProfiles", {
+      importRunId,
+      ...profile,
+      locale: "de-DE",
+    })
+    await ctx.db.insert("intervalsSyncStates", {
+      ownerTokenIdentifier: owner,
+      connectionVersion,
+      status: options.syncStatus ?? "idle",
+      activeImportRunId: importRunId,
+      lastSuccessfulSyncAt: 2,
+      lastSyncErrorCode:
+        options.syncStatus === "failed" ? "INVALID_RESPONSE" : undefined,
+      profileCount: 1,
+      plannedWorkoutCount: 0,
+      activityCount: 0,
+      updatedAt: 2,
+    })
+    return importRunId
+  })
+}
+
+describe("Intervals calendar", () => {
+  test("requires authentication and rejects invalid months", async () => {
+    const t = convexTest(schema, modules)
+    await expect(
+      t.query(api.intervals.getCalendarMonth, { month: "2026-06" }),
+    ).rejects.toThrow("Not authenticated")
+    await expect(
+      t
+        .withIdentity(identityA)
+        .query(api.intervals.getCalendarMonth, { month: "2026-13" }),
+    ).rejects.toThrow()
+  })
+
+  test("distinguishes disconnected and first-import states", async () => {
+    const t = convexTest(schema, modules)
+    expect(
+      await t
+        .withIdentity(identityA)
+        .query(api.intervals.getCalendarMonth, { month: "2026-06" }),
+    ).toMatchObject({ state: "disconnected" })
+    await t.mutation(internal.intervals.upsertConnection, {
+      ownerTokenIdentifier: identityA.tokenIdentifier,
+      ...credential,
+    })
+    expect(
+      await t
+        .withIdentity(identityA)
+        .query(api.intervals.getCalendarMonth, { month: "2026-06" }),
+    ).toMatchObject({ state: "awaiting_first_import", syncStatus: "queued" })
+  })
+
+  test("returns local-date bounded records from only the owner's active snapshot", async () => {
+    const t = convexTest(schema, modules)
+    const active = await seedCalendarSnapshot(t)
+    await t.run(async (ctx) => {
+      await ctx.db.insert("intervalsPlannedWorkouts", {
+        importRunId: active,
+        sourceEventId: "first",
+        category: "workout",
+        localStartDate: "2026-06-01",
+        name: "June plan",
+      })
+      await ctx.db.insert("intervalsActivities", {
+        importRunId: active,
+        sourceActivityId: "last",
+        startAt: 1,
+        localStartDateTime: "2026-06-30T23:59:59",
+        sport: "Ride",
+      })
+      await ctx.db.insert("intervalsActivities", {
+        importRunId: active,
+        sourceActivityId: "next",
+        startAt: 2,
+        localStartDateTime: "2026-07-01T00:00:00",
+        sport: "Run",
+      })
+      const staging = await ctx.db.insert("intervalsImportRuns", {
+        ownerTokenIdentifier: identityA.tokenIdentifier,
+        athleteId: credential.athleteId,
+        connectionVersion: "calendar-version",
+        status: "staging",
+        windowOldestLocalDate: "2026-01-01",
+        windowNewestLocalDate: "2026-12-31",
+        activitiesThroughAt: 10,
+        startedAt: 3,
+      })
+      await ctx.db.insert("intervalsPlannedWorkouts", {
+        importRunId: staging,
+        sourceEventId: "staged",
+        category: "race_a",
+        localStartDate: "2026-06-10",
+      })
+    })
+
+    const result = await t
+      .withIdentity(identityA)
+      .query(api.intervals.getCalendarMonth, { month: "2026-06" })
+    expect(result).toMatchObject({
+      state: "available",
+      timezone: "Europe/Berlin",
+      locale: "de-DE",
+      syncStatus: "ready",
+      plannedWorkouts: [{ sourceEventId: "first" }],
+      activities: [{ sourceActivityId: "last" }],
+    })
+    expect(result).not.toHaveProperty("activeImportRunId")
+    expect(
+      await t
+        .withIdentity(identityB)
+        .query(api.intervals.getCalendarMonth, { month: "2026-06" }),
+    ).toMatchObject({ state: "disconnected", plannedWorkouts: [] })
+  })
+
+  test("keeps the completed snapshot visible after a failed refresh", async () => {
+    const t = convexTest(schema, modules)
+    const active = await seedCalendarSnapshot(t, { syncStatus: "failed" })
+    await t.run((ctx) =>
+      ctx.db.insert("intervalsPlannedWorkouts", {
+        importRunId: active,
+        sourceEventId: "preserved",
+        category: "workout",
+        localStartDate: "2026-06-12",
+      }),
+    )
+    expect(
+      await t
+        .withIdentity(identityA)
+        .query(api.intervals.getCalendarMonth, { month: "2026-06" }),
+    ).toMatchObject({
+      state: "available",
+      syncStatus: "error",
+      lastSyncErrorCode: "INVALID_RESPONSE",
+      plannedWorkouts: [{ sourceEventId: "preserved" }],
+    })
+  })
+
+  test("reports defensive monthly truncation", async () => {
+    const t = convexTest(schema, modules)
+    const active = await seedCalendarSnapshot(t)
+    await t.run(async (ctx) => {
+      for (let index = 0; index < 501; index += 1) {
+        await ctx.db.insert("intervalsPlannedWorkouts", {
+          importRunId: active,
+          sourceEventId: `plan-${index}`,
+          category: "workout",
+          localStartDate: "2026-06-15",
+        })
+      }
+    })
+    const result = await t
+      .withIdentity(identityA)
+      .query(api.intervals.getCalendarMonth, { month: "2026-06" })
+    expect(result).toMatchObject({ state: "available", truncated: true })
+    expect(result.plannedWorkouts).toHaveLength(500)
+  })
+})
