@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 
-import { isRedirect } from "@tanstack/react-router"
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  isRedirect,
+  RouterContextProvider,
+} from "@tanstack/react-router"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import type { ReactNode } from "react"
 import { afterEach, describe, expect, test } from "vitest"
 import {
   buildCalendarGrid,
@@ -29,6 +36,17 @@ const available: CalendarMonthData = {
   plannedWorkouts: [],
   activities: [],
   truncated: false,
+}
+
+function renderWithRouter(children: ReactNode) {
+  const router = createRouter({
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+    routeTree: createRootRoute(),
+  })
+
+  return render(
+    <RouterContextProvider router={router}>{children}</RouterContextProvider>,
+  )
 }
 
 describe("calendar helpers", () => {
@@ -137,12 +155,12 @@ describe("calendar view", () => {
     ],
     [available, "No workouts this month"],
   ])("renders a calendar data state", (data, heading) => {
-    render(<CalendarView data={data} month="2026-06" />)
+    renderWithRouter(<CalendarView data={data} month="2026-06" />)
     expect(screen.getByText(heading)).toBeTruthy()
   })
 
   test("shows refresh and overflow notices while preserving entries", () => {
-    render(
+    renderWithRouter(
       <CalendarView
         data={{
           ...available,
@@ -167,7 +185,7 @@ describe("calendar view", () => {
   })
 
   test("opens and closes a merged workout detail and omits absent metrics", () => {
-    render(
+    renderWithRouter(
       <CalendarView
         data={{
           ...available,
@@ -209,7 +227,7 @@ describe("calendar view", () => {
   })
 
   test("selects a mobile-grid day and presents its workout list", () => {
-    render(
+    renderWithRouter(
       <CalendarView
         data={{
           ...available,

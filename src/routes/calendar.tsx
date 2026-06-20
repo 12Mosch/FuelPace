@@ -1,8 +1,10 @@
 import { convexQuery } from "@convex-dev/react-query"
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
+import { CalendarDays } from "lucide-react"
 import { useMemo, useState } from "react"
 import { api } from "../../convex/_generated/api"
+import { AppShell } from "../components/ui"
 import {
   buildCalendarGrid,
   type CalendarEntry,
@@ -88,21 +90,9 @@ function CalendarError() {
 
 function CalendarShell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="calendar-shell">
-      <div className="calendar-grain" aria-hidden="true" />
-      <header className="journal-header">
-        <a className="journal-brand" href="/">
-          FuelPace
-        </a>
-        <nav aria-label="Primary navigation">
-          <a aria-current="page" href="/calendar">
-            Calendar
-          </a>
-          <a href="/settings">Settings</a>
-        </nav>
-      </header>
-      {children}
-    </main>
+    <AppShell active="training">
+      <main className="page-content calendar-shell">{children}</main>
+    </AppShell>
   )
 }
 
@@ -305,8 +295,14 @@ function CalendarShellContent({
     <CalendarShell>
       <section className="calendar-heading">
         <div>
+          <span className="calendar-title-icon" aria-hidden="true">
+            <CalendarDays />
+          </span>
           <p className="section-kicker">Imported workouts</p>
           <h1>{title}</h1>
+          <p className="calendar-subtitle">
+            Your planned and completed training, in one place.
+          </p>
         </div>
         <nav className="month-controls" aria-label="Calendar month navigation">
           <a
