@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useAction, useMutation, useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
+import { KeyRound, Link2, ShieldCheck, Unplug } from "lucide-react"
 import { type FormEvent, useState } from "react"
 import { api } from "../../convex/_generated/api"
+import { AppShell, Button, ButtonLink, SectionLabel } from "../components/ui"
 import { requireRouteUser } from "../lib/route-auth"
 
 const INTERVALS_DEVELOPER_SETTINGS_URL = "https://intervals.icu/settings"
@@ -21,40 +23,51 @@ export function requireSettingsUser(user: unknown) {
 
 function SettingsError() {
   return (
-    <main className="settings-shell">
-      <section className="integration-card" role="alert">
-        <div className="integration-content">
-          <p className="section-kicker">Connection unavailable</p>
-          <h1>Settings could not be loaded</h1>
-          <p className="integration-copy">
-            Refresh the page to try again. If the problem continues, return
-            later without reconnecting or disconnecting your account.
-          </p>
-          <a className="button-primary" href="/settings">
-            Try again
-          </a>
-        </div>
-      </section>
-    </main>
+    <AppShell active="settings">
+      <main className="page-content settings-shell">
+        <section className="integration-card" role="alert">
+          <div className="integration-content">
+            <SectionLabel>Connection unavailable</SectionLabel>
+            <h1>Settings could not be loaded</h1>
+            <p className="integration-copy">
+              Refresh the page to try again. Your existing connection has not
+              been changed.
+            </p>
+            <ButtonLink href="/settings">Try again</ButtonLink>
+          </div>
+        </section>
+      </main>
+    </AppShell>
   )
 }
 
 function SettingsPage() {
   return (
-    <main className="settings-shell">
-      <div className="settings-orbit" aria-hidden="true" />
-      <header className="settings-header">
-        <Link className="eyebrow-link" to="/">
-          FuelPace
-        </Link>
-        <div>
-          <p className="section-kicker">Account controls</p>
-          <h1>Settings</h1>
-          <p>Manage the services FuelPace can use on your behalf.</p>
+    <AppShell active="settings">
+      <main className="page-content settings-shell">
+        <header className="settings-header">
+          <div>
+            <SectionLabel>Account controls</SectionLabel>
+            <h1>Settings</h1>
+            <p>Manage the services FuelPace can use on your behalf.</p>
+          </div>
+          <Link className="back-link" to="/">
+            Back to today
+          </Link>
+        </header>
+        <div className="settings-layout">
+          <aside className="settings-nav" aria-label="Settings sections">
+            <a aria-current="page" href="#connections">
+              <Link2 /> Connections
+            </a>
+            <span>
+              <ShieldCheck /> Privacy &amp; data
+            </span>
+          </aside>
+          <IntervalsCard />
         </div>
-      </header>
-      <IntervalsCard />
-    </main>
+      </main>
+    </AppShell>
   )
 }
 
@@ -163,9 +176,13 @@ export function IntervalsCardView({
   }
 
   return (
-    <section className="integration-card" aria-labelledby="intervals-title">
+    <section
+      className="integration-card"
+      aria-labelledby="intervals-title"
+      id="connections"
+    >
       <div className="integration-mark" aria-hidden="true">
-        <span>i</span>
+        <Link2 />
       </div>
       <div className="integration-content">
         <div className="integration-heading">
@@ -285,8 +302,7 @@ export function IntervalsCardView({
                 .
               </p>
               <div className="integration-actions">
-                <button
-                  className="button-primary"
+                <Button
                   disabled={isConnecting || isDisconnecting}
                   type="submit"
                 >
@@ -295,21 +311,23 @@ export function IntervalsCardView({
                     : connection
                       ? "Replace API key"
                       : "Connect Intervals.icu"}
-                </button>
+                </Button>
                 {connection ? (
-                  <button
-                    className="button-danger"
+                  <Button
                     disabled={isConnecting || isDisconnecting}
                     onClick={handleDisconnect}
                     type="button"
+                    variant="danger"
                   >
+                    <Unplug />
                     {isDisconnecting ? "Disconnecting..." : "Disconnect"}
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             </form>
 
             <p className="revocation-note">
+              <KeyRound aria-hidden="true" />
               Treat this API key as an account-wide credential. If it is
               compromised, revoke or regenerate it in Intervals.icu.
               Disconnecting removes it from FuelPace only.
