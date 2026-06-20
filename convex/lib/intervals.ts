@@ -19,6 +19,7 @@ export type IntervalsPlannedWorkout = {
   category: PlannedWorkoutCategory
   sport?: string
   localStartDate: string
+  localStartDateTime?: string
   localEndDate?: string
   name?: string
   description?: string
@@ -241,6 +242,7 @@ export function parseIntervalsPlannedWorkoutResponse(
     category,
     sport: optionalText(response, "type"),
     localStartDate: start.slice(0, 10),
+    localStartDateTime: start,
     localEndDate: end?.slice(0, 10),
     name: optionalText(response, "name"),
     description: optionalText(response, "description"),

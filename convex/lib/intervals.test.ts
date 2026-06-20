@@ -88,6 +88,7 @@ describe("Intervals normalized training data", () => {
       category: "race_a",
       sport: "Ride",
       localStartDate: "2026-06-20",
+      localStartDateTime: "2026-06-20T08:00:00",
       localEndDate: undefined,
       name: "A race",
       description: undefined,
