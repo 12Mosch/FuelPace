@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router"
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
 import { getAuth } from "@workos/authkit-tanstack-react-start"
+import { IntervalsSyncBootstrap } from "../components/intervals-sync-bootstrap"
 
 import appCss from "../styles.css?url"
 
@@ -61,6 +62,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <IntervalsSyncBootstrap />
         {children}
         <TanStackDevtools
           config={{
