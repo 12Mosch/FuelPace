@@ -9,6 +9,10 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as intervals from "../intervals.js";
+import type * as intervalsNode from "../intervalsNode.js";
+import type * as lib_credentialCrypto from "../lib/credentialCrypto.js";
+import type * as lib_intervals from "../lib/intervals.js";
 
 import type {
   ApiFromModules,
@@ -18,6 +22,10 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  intervals: typeof intervals;
+  intervalsNode: typeof intervalsNode;
+  "lib/credentialCrypto": typeof lib_credentialCrypto;
+  "lib/intervals": typeof lib_intervals;
 }>;
 
 /**

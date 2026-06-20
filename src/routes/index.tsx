@@ -1,6 +1,6 @@
 import { convexQuery } from "@convex-dev/react-query"
 import { useSuspenseQuery } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, Link } from "@tanstack/react-router"
 import { useAuth } from "@workos/authkit-tanstack-react-start/client"
 import { Authenticated, AuthLoading, Unauthenticated } from "convex/react"
 import { api } from "../../convex/_generated/api"
@@ -44,6 +44,9 @@ function SignedIn() {
       >
         Sign out
       </button>
+      <Link className="rounded border border-black px-4 py-2" to="/settings">
+        Settings
+      </Link>
     </section>
   )
 }
