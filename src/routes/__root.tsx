@@ -1,10 +1,21 @@
+import type { ConvexQueryClient } from "@convex-dev/react-query"
 import { TanStackDevtools } from "@tanstack/react-devtools"
-import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router"
+import type { QueryClient } from "@tanstack/react-query"
+import {
+  createRootRouteWithContext,
+  HeadContent,
+  Outlet,
+  Scripts,
+} from "@tanstack/react-router"
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
+import { getAuth } from "@workos/authkit-tanstack-react-start"
 
 import appCss from "../styles.css?url"
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{
+  convexQueryClient: ConvexQueryClient
+  queryClient: QueryClient
+}>()({
   head: () => ({
     meta: [
       {
@@ -15,7 +26,7 @@ export const Route = createRootRoute({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "TanStack Start Starter",
+        title: "FuelPace",
       },
     ],
     links: [
@@ -25,8 +36,23 @@ export const Route = createRootRoute({
       },
     ],
   }),
-  shellComponent: RootDocument,
+  beforeLoad: async ({ context }) => {
+    const auth = await getAuth()
+    if (auth.user) {
+      context.convexQueryClient.serverHttpClient?.setAuth(auth.accessToken)
+    }
+    return { user: auth.user }
+  },
+  component: RootComponent,
 })
+
+function RootComponent() {
+  return (
+    <RootDocument>
+      <Outlet />
+    </RootDocument>
+  )
+}
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (

@@ -7,7 +7,8 @@
     "#/*": "./src/*"
   },
   "scripts": {
-    "dev": "vite dev --port 3000",
+    "dev": "convex dev --start 'vite dev --port 3000'",
+    "dev:web": "vite dev --port 3000",
     "generate-routes": "tsr generate",
     "build": "vite build",
     "preview": "vite preview",
@@ -18,13 +19,17 @@
     "check": "biome check --write && bun run typecheck && bun run test"
   },
   "dependencies": {
+    "@convex-dev/react-query": "^0.1.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-devtools": "latest",
+    "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-router": "latest",
     "@tanstack/react-router-devtools": "latest",
     "@tanstack/react-router-ssr-query": "latest",
     "@tanstack/react-start": "latest",
     "@tanstack/router-plugin": "^1.132.0",
+    "@workos/authkit-tanstack-react-start": "^0.9.1",
+    "convex": "^1.41.0",
     "lucide-react": "^1.21.0",
     "nitro": "npm:nitro-nightly@latest",
     "react": "^19.2.0",
