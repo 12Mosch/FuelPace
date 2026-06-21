@@ -928,6 +928,283 @@ svg {
   font-size: 0.82rem;
   font-weight: 700;
 }
+.settings-cards {
+  display: grid;
+  gap: 1.5rem;
+}
+.hydration-mark,
+.hydration-orb {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+.hydration-settings-grid {
+  display: grid;
+  margin-top: 1.5rem;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 1.8rem;
+}
+.hydration-subsection {
+  min-width: 0;
+  padding: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--canvas);
+}
+.hydration-subsection h3,
+.sweat-history h3 {
+  display: flex;
+  margin: 0 0 1rem;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+}
+.hydration-subsection h3 svg {
+  color: var(--blue);
+}
+.subsection-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.subsection-heading select,
+.sweat-test-form select,
+.sweat-test-form input,
+.location-search input {
+  min-height: 2.65rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #cac6bd;
+  border-radius: 0.45rem;
+  background: white;
+}
+.saved-location {
+  display: flex;
+  margin-bottom: 1rem;
+  padding: 0.8rem;
+  align-items: center;
+  justify-content: space-between;
+  border-left: 3px solid var(--blue);
+  background: white;
+}
+.saved-location span,
+.location-results span,
+.sweat-history li span {
+  display: grid;
+}
+.saved-location small,
+.location-results small,
+.sweat-history small {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.location-search label,
+.sweat-test-form label {
+  display: grid;
+  gap: 0.35rem;
+  color: #4f504b;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+.location-search > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+}
+.location-search input {
+  width: 100%;
+  min-width: 0;
+}
+.location-search .button {
+  white-space: nowrap;
+}
+.location-results,
+.sweat-history ul {
+  display: grid;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  gap: 0.35rem;
+  list-style: none;
+}
+.location-results button {
+  display: grid;
+  width: 100%;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  background: white;
+  cursor: pointer;
+  text-align: left;
+}
+.location-results button:hover {
+  border-color: var(--blue);
+}
+.sweat-test-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+.sweat-test-form .full-field,
+.sweat-test-form > select {
+  grid-column: 1 / -1;
+}
+.sweat-test-form > .button {
+  align-self: end;
+}
+.form-message {
+  padding: 0.8rem 1rem;
+  border-left: 3px solid var(--blue);
+  background: var(--blue-soft);
+  font-size: 0.8rem;
+}
+.sweat-history {
+  margin-top: 1.5rem;
+}
+.sweat-history li {
+  display: flex;
+  padding: 0.7rem 0;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+.clinical-note {
+  margin: 1.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+/* Hydration plan */
+.hydration-detail {
+  margin: 1.8rem 0;
+  padding: clamp(1.3rem, 3vw, 2.2rem);
+  border: 1px solid #d8e5f4;
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, #f7fbff, #fff 62%);
+  box-shadow: 0 1.3rem 4rem rgb(39 115 200 / 7%);
+}
+.loading-hydration {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--muted);
+}
+.hydration-total {
+  display: grid;
+  align-items: center;
+  grid-template-columns: 4.4rem 1fr auto;
+  gap: 1rem;
+}
+.hydration-orb {
+  display: grid;
+  width: 4.4rem;
+  height: 4.4rem;
+  place-items: center;
+  border-radius: 50%;
+}
+.hydration-orb svg {
+  width: 2.1rem;
+  height: 2.1rem;
+}
+.hydration-total h2 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.3rem);
+  letter-spacing: -0.06em;
+}
+.hydration-total h2 small {
+  color: var(--muted);
+  font-size: 0.9rem;
+  letter-spacing: 0;
+}
+.hydration-total p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.confidence-badge {
+  padding: 0.45rem 0.7rem;
+  border-radius: 99px;
+  background: #efeee9;
+  color: #66655f;
+  font-size: 0.67rem;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+.confidence-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+.confidence-high {
+  background: var(--green-soft);
+  color: var(--green);
+}
+.confidence-medium {
+  background: #fff5d9;
+  color: #83641c;
+}
+.hydration-breakdown {
+  display: grid;
+  margin: 1.5rem 0 0;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid #d8e5f4;
+  border-bottom: 1px solid #d8e5f4;
+}
+.hydration-breakdown > div {
+  padding: 1rem;
+  border-right: 1px solid #d8e5f4;
+}
+.hydration-breakdown > div:last-child {
+  border-right: 0;
+}
+.hydration-breakdown dt {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.hydration-breakdown dd {
+  margin: 0.3rem 0 0;
+  font-weight: 800;
+}
+.hydration-workouts {
+  display: grid;
+  margin-top: 1rem;
+  gap: 0.7rem;
+}
+.hydration-workouts article {
+  display: grid;
+  padding: 1rem;
+  grid-template-columns: 1fr auto;
+  gap: 0.25rem 1rem;
+  border-radius: 0.55rem;
+  background: white;
+}
+.hydration-workouts article > div {
+  display: grid;
+}
+.hydration-workouts article span,
+.hydration-workouts article small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.hydration-workouts article p {
+  grid-column: 1 / -1;
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+}
+.hydration-workouts article > small {
+  grid-column: 1 / -1;
+}
+.hydration-rest-day {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+.hydration-notes {
+  margin: 1rem 0 0;
+  padding-left: 1.2rem;
+  color: #6d581e;
+  font-size: 0.76rem;
+}
 
 /* Calendar */
 .calendar-shell {
@@ -1317,6 +1594,9 @@ svg {
   .workout-detail {
     position: static;
   }
+  .hydration-settings-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1475,6 +1755,34 @@ svg {
   }
   .integration-heading {
     align-items: center;
+  }
+  .hydration-total {
+    grid-template-columns: 3.5rem 1fr;
+  }
+  .hydration-orb {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+  .confidence-badge {
+    width: max-content;
+    grid-column: 2;
+  }
+  .hydration-breakdown {
+    grid-template-columns: 1fr;
+  }
+  .hydration-breakdown > div {
+    border-right: 0;
+    border-bottom: 1px solid #d8e5f4;
+  }
+  .hydration-breakdown > div:last-child {
+    border-bottom: 0;
+  }
+  .sweat-test-form {
+    grid-template-columns: 1fr;
+  }
+  .sweat-test-form > label,
+  .sweat-test-form > select {
+    grid-column: 1;
   }
   .calendar-heading {
     align-items: start;

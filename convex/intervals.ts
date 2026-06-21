@@ -124,6 +124,7 @@ const plannedWorkoutValidator = v.object({
   ),
   sport: v.optional(v.string()),
   localStartDate: v.string(),
+  localStartDateTime: v.optional(v.string()),
   localEndDate: v.optional(v.string()),
   name: v.optional(v.string()),
   description: v.optional(v.string()),
@@ -394,11 +395,11 @@ export const getCalendarMonth = query({
       .sort((left, right) => {
         const leftDate =
           left.kind === "planned"
-            ? left.row.localStartDate
+            ? (left.row.localStartDateTime ?? left.row.localStartDate)
             : left.row.localStartDateTime
         const rightDate =
           right.kind === "planned"
-            ? right.row.localStartDate
+            ? (right.row.localStartDateTime ?? right.row.localStartDate)
             : right.row.localStartDateTime
         return leftDate.localeCompare(rightDate)
       })
@@ -412,6 +413,7 @@ export const getCalendarMonth = query({
               category: entry.row.category,
               sport: entry.row.sport,
               localStartDate: entry.row.localStartDate,
+              localStartDateTime: entry.row.localStartDateTime,
               localEndDate: entry.row.localEndDate,
               name: entry.row.name,
               description: entry.row.description,

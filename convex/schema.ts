@@ -86,6 +86,7 @@ export default defineSchema({
     ),
     sport: v.optional(v.string()),
     localStartDate: v.string(),
+    localStartDateTime: v.optional(v.string()),
     localEndDate: v.optional(v.string()),
     name: v.optional(v.string()),
     description: v.optional(v.string()),
@@ -143,4 +144,76 @@ export default defineSchema({
       "importRunId",
       "localStartDateTime",
     ]),
+
+  hydrationSettings: defineTable({
+    ownerTokenIdentifier: v.string(),
+    displayName: v.string(),
+    latitude: v.number(),
+    longitude: v.number(),
+    timezone: v.string(),
+    updatedAt: v.number(),
+  }).index("by_ownerTokenIdentifier", ["ownerTokenIdentifier"]),
+
+  hydrationSweatTests: defineTable({
+    ownerTokenIdentifier: v.string(),
+    sourceActivityId: v.string(),
+    activityName: v.optional(v.string()),
+    activityStartAt: v.number(),
+    preWeightKg: v.number(),
+    postWeightKg: v.number(),
+    consumedLitres: v.number(),
+    urineLitres: v.optional(v.number()),
+    scalePrecisionKg: v.optional(v.number()),
+    volumePrecisionLitres: v.optional(v.number()),
+    wetClothingAdjustmentKg: v.optional(v.number()),
+    wetClothingUncertaintyKg: v.optional(v.number()),
+    durationSeconds: v.number(),
+    sport: v.string(),
+    isIndoor: v.boolean(),
+    intensity: v.optional(v.number()),
+    intensityMetric: v.optional(
+      v.object({
+        kind: v.union(
+          v.literal("threshold_percent"),
+          v.literal("power_watts"),
+          v.literal("pace_seconds_per_kilometre"),
+          v.literal("heart_rate_bpm"),
+        ),
+        value: v.number(),
+      }),
+    ),
+    sweatRateLitresPerHour: v.number(),
+    lowSweatRateLitresPerHour: v.optional(v.number()),
+    highSweatRateLitresPerHour: v.optional(v.number()),
+    correctedBodyMassChangePercent: v.optional(v.number()),
+    weather: v.optional(
+      v.object({
+        apparentTemperatureC: v.number(),
+        temperatureC: v.number(),
+        relativeHumidityPercent: v.number(),
+      }),
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_ownerTokenIdentifier", ["ownerTokenIdentifier"])
+    .index("by_ownerTokenIdentifier_and_sourceActivityId", [
+      "ownerTokenIdentifier",
+      "sourceActivityId",
+    ]),
+
+  hydrationWeatherCaches: defineTable({
+    ownerTokenIdentifier: v.string(),
+    latitude: v.number(),
+    longitude: v.number(),
+    timezone: v.string(),
+    fetchedAt: v.number(),
+    hours: v.array(
+      v.object({
+        localDateTime: v.string(),
+        apparentTemperatureC: v.number(),
+        temperatureC: v.number(),
+        relativeHumidityPercent: v.number(),
+      }),
+    ),
+  }).index("by_ownerTokenIdentifier", ["ownerTokenIdentifier"]),
 })

@@ -59,6 +59,10 @@ describe("calendar helpers", () => {
       expect((error as { options: { href: string } }).options.href).toBe(
         "/api/auth/sign-in?returnPathname=/calendar",
       )
+      expect(
+        (error as { options: { reloadDocument: boolean } }).options
+          .reloadDocument,
+      ).toBe(true)
     }
   })
 
